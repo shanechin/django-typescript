@@ -71,7 +71,13 @@ class ModelTypeSerializer(object):
         numbers in the generated TypeScript, so keep the wire value numeric.
         """
         kwargs = dict(field_kwargs)
-        if isinstance(field_class, type) and issubclass(field_class, serializers.BigIntegerField):
+        # DRF added serializers.BigIntegerField in 3.17. Older releases use IntegerField.
+        big_integer_field = getattr(serializers, 'BigIntegerField', None)
+        if (
+            big_integer_field is not None
+            and isinstance(field_class, type)
+            and issubclass(field_class, big_integer_field)
+        ):
             kwargs['coerce_to_string'] = False
         return field_class(**kwargs)
 

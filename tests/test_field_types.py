@@ -30,8 +30,10 @@ class TestFieldTypeTranspiler(TestCase):
             models.BigAutoField,
             models.SmallAutoField,
             serializers.IntegerField,
-            serializers.BigIntegerField,
         ]
+        big_integer_field = getattr(serializers, 'BigIntegerField', None)
+        if big_integer_field is not None:
+            integer_fields.append(big_integer_field)
         for field_cls in integer_fields:
             with self.subTest(field=field_cls.__name__):
                 self.assertEqual(FieldTypeTranspiler.transpile(field_cls()), 'number')
