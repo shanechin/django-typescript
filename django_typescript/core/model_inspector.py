@@ -51,8 +51,13 @@ class ModelInspector(object):
         return self.forward_relation_fields + self.reverse_relation_fields
 
     @cached_property
+    def many_to_many_fields(self) -> List[models.ManyToManyField]:
+        return [f for f in self.model_fields if isinstance(f, models.ManyToManyField)]
+
+    @cached_property
     def concrete_fields(self):
-        return [f for f in self.model_fields if f not in self.relation_fields]
+        skipped = set(self.relation_fields) | set(self.many_to_many_fields)
+        return [f for f in self.model_fields if f not in skipped]
 
 
 

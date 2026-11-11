@@ -39,7 +39,7 @@ def run_tests(*test_args):
         SITE_ID=1,
         SECRET_KEY='not very secret in tests',
         USE_I18N=True,
-        USE_L10N=True,
+        DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
         ALLOWED_HOSTS=['*'],
         STATIC_URL='/static/',
         # ROOT_URLCONF='tests.urls',

@@ -75,14 +75,14 @@ class TestModelTypeViews(TestCase):
         self.client.force_authenticate(user=test_user)
         view_url = reverse('generic_model:create')
         response = self.client.post(view_url, data={}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_create_permission(self):
         test_user = User.objects.create(username='test', is_staff=True)
         self.client.force_authenticate(user=test_user)
         view_url = reverse('generic_model:create')
         response = self.client.post(view_url, data={}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_view(self):
         data = {'name': 'test'}

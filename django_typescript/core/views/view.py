@@ -1,7 +1,6 @@
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import api_view, permission_classes as add_permission_classes
-from rest_framework.settings import api_settings
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework import status
 
 from django_typescript.core.types import PermissionClasses
@@ -24,11 +23,15 @@ class View(object):
         raise NotImplementedError
 
     def view(self):
+        """
+        Build a DRF function view.
+
+        Policy decorators have to be applied to the raw function. Current DRF
+        rejects ``@permission_classes`` wrapped around the result of ``@api_view``.
+        """
         view_func = self._view_function()
         if self.permission_classes:
-            view_func.permission_classes = self.permission_classes
-        view = api_view([self.REQUEST_METHOD])(view_func)
-        view = add_permission_classes(self.permission_classes)(view)
-        view.authentication_classes = api_settings.DEFAULT_AUTHENTICATION_CLASSES
-        return view
+            view_func = add_permission_classes(self.permission_classes)(view_func)
+        view_func.authentication_classes = api_settings.DEFAULT_AUTHENTICATION_CLASSES
+        return api_view([self.REQUEST_METHOD])(view_func)
 

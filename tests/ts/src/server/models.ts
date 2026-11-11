@@ -234,7 +234,7 @@ export class ThingQuerySet {
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<keyof ThingFields>): Promise<ServerDataPayload<PaginatedData<QuerysetValuesList<ThingFields>>>> {
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<ThingFields>[]): this {
@@ -543,7 +543,7 @@ export class ThingOneToOneTargetQuerySet {
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<keyof ThingOneToOneTargetFields>): Promise<ServerDataPayload<PaginatedData<QuerysetValuesList<ThingOneToOneTargetFields>>>> {
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<ThingOneToOneTargetFields>[]): this {
@@ -877,7 +877,7 @@ export class ThingChildQuerySet {
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<keyof ThingChildFields>): Promise<ServerDataPayload<PaginatedData<QuerysetValuesList<ThingChildFields>>>> {
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<ThingChildFields>[]): this {
@@ -1219,7 +1219,7 @@ export class ThingChildChildQuerySet {
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<keyof ThingChildChildFields>): Promise<ServerDataPayload<PaginatedData<QuerysetValuesList<ThingChildChildFields>>>> {
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<ThingChildChildFields>[]): this {
@@ -1567,7 +1567,7 @@ export class TimestampedModelQuerySet {
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<keyof TimestampedModelFields>): Promise<ServerDataPayload<PaginatedData<QuerysetValuesList<TimestampedModelFields>>>> {
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<TimestampedModelFields>[]): this {

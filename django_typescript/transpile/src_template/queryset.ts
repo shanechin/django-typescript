@@ -97,7 +97,7 @@ class __$queryset_name__{
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<[keyof __$field_interface_name__]>): ServerDataPayload<PaginatedData<QuerysetValuesList<__$field_interface_name__>>>{
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<__$field_interface_name__>[]): this{

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django-typescript"
+version = "0.3.0"
+description = "Generate TypeScript models and clients from Django and Django REST Framework."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name = "Peter Woyzbun", email = "peter.woyzbun@gmail.com"},
+]
+keywords = ["django", "typescript", "django-rest-framework"]
+classifiers = [
+    "Framework :: Django",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: TypeScript",
+]
+dependencies = [
+    "Django>=5.0,<6",
+    "djangorestframework>=3.15,<4",
+    "jinja2>=3.1",
+    "pyparsing>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/peter-woyzbun/django-ts"
+
+[tool.setuptools.packages.find]
+include = ["django_typescript*"]
+
+[tool.setuptools.package-data]
+django_typescript = [
+    "transpile/src_template/*.ts",
+    "transpile/src_template/*.tpl.ts",
+    "transpile/src_template/core/*.ts",
+]

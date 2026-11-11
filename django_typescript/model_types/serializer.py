@@ -58,7 +58,22 @@ class ModelTypeSerializer(object):
     def _build_fields(self):
         self._build_concrete_fields()
         self._build_forward_relation_fields()
+        self._build_many_to_many_fields()
         self._build_property_fields()
+
+    def _instantiate_field(self, field_class, field_kwargs):
+        """
+        Build a serializer field.
+
+        DRF's ``BigIntegerField`` stringifies values when
+        ``COERCE_BIGINT_TO_STRING`` is on (the default), which makes every
+        big-integer variant show up as a string in JSON. Integer fields are
+        numbers in the generated TypeScript, so keep the wire value numeric.
+        """
+        kwargs = dict(field_kwargs)
+        if isinstance(field_class, type) and issubclass(field_class, serializers.BigIntegerField):
+            kwargs['coerce_to_string'] = False
+        return field_class(**kwargs)
 
     def _build_concrete_fields(self):
         helper_serializer = serializers.ModelSerializer()
@@ -68,7 +83,7 @@ class ModelTypeSerializer(object):
             else:
                 field_class, field_kwargs = helper_serializer.build_standard_field(model_field.name, model_field)
             kwarg_overrides = self.serializer_field_kwargs.get(model_field.name, {})
-            field_serializer = field_class(**{**field_kwargs, **kwarg_overrides})
+            field_serializer = self._instantiate_field(field_class, {**field_kwargs, **kwarg_overrides})
             self.concrete_fields[model_field.name] = field_serializer
             self.field_info.append(
                 FieldInfo(serializer_field_name=model_field.name, model_field=model_field, serializer=field_serializer)
@@ -81,7 +96,10 @@ class ModelTypeSerializer(object):
                     model_proxy_field = related_model_cls._meta.get_field(proxy_field_name)
                     field_class, field_kwargs = helper_serializer.build_standard_field(model_proxy_field.name, model_proxy_field)
                     kwarg_overrides = self.serializer_field_kwargs.get(model_proxy_field.name, {})
-                    field_serializer = field_class(**{**field_kwargs, **kwarg_overrides, **{'source': one_to_one_field.name + '.' + model_proxy_field.name}})
+                    field_serializer = self._instantiate_field(
+                        field_class,
+                        {**field_kwargs, **kwarg_overrides, **{'source': one_to_one_field.name + '.' + model_proxy_field.name}},
+                    )
                     self.concrete_fields[model_proxy_field.name] = field_serializer
                     self.field_info.append(
                         FieldInfo(serializer_field_name=model_proxy_field.name, model_field=model_proxy_field,
@@ -114,8 +132,33 @@ class ModelTypeSerializer(object):
         for model_field in self.model_inspector.forward_relation_fields:
             field_class = self._resolve_forward_rel_field_type(model_field=model_field)
             field_kwargs = self._forward_rel_field_kwargs(model_field=model_field)
-            field_serializer = field_class(**field_kwargs)
+            field_serializer = self._instantiate_field(field_class, field_kwargs)
             field_name = model_field.get_attname()
+            self.forward_rel_fields[field_name] = field_serializer
+            self.forward_rel_model_fields[field_name] = model_field
+            self.field_info.append(
+                FieldInfo(serializer_field_name=field_name, model_field=model_field, serializer=field_serializer)
+            )
+
+    def _build_many_to_many_fields(self):
+        for model_field in self.model_inspector.many_to_many_fields:
+            kwarg_overrides = dict(self.serializer_field_kwargs.get(model_field.name, {}))
+            read_only = kwarg_overrides.get('read_only', not model_field.editable)
+            kwargs = {
+                'many': True,
+                'required': False if read_only else not model_field.blank,
+            }
+            if not read_only:
+                kwargs['queryset'] = model_field.related_model._default_manager.all()
+                kwargs['allow_empty'] = bool(model_field.blank)
+            else:
+                kwargs['read_only'] = True
+            kwargs.update(kwarg_overrides)
+            if kwargs.get('read_only'):
+                kwargs.pop('queryset', None)
+                kwargs.pop('allow_empty', None)
+            field_serializer = serializers.PrimaryKeyRelatedField(**kwargs)
+            field_name = model_field.name
             self.forward_rel_fields[field_name] = field_serializer
             self.forward_rel_model_fields[field_name] = model_field
             self.field_info.append(
@@ -133,11 +176,21 @@ class ModelTypeSerializer(object):
     def _resolve_validator_forward_relations(self, data: dict):
         resolved_relations = {}
         for k, v in data.items():
-            #
             if k in self.forward_rel_model_fields and v is not None:
                 model_field = self.forward_rel_model_fields[k]
-                if model_field.name in self.validator.validator_field_names:
-                    resolved_relations[model_field.name] = model_field.related_model.objects.get(pk=v)
+                if model_field.name not in self.validator.validator_field_names:
+                    continue
+                if getattr(model_field, 'many_to_many', False):
+                    items = v if isinstance(v, (list, tuple)) else [v]
+                    resolved = []
+                    for item in items:
+                        if isinstance(item, models.Model):
+                            resolved.append(item)
+                        else:
+                            resolved.append(model_field.related_model.objects.get(pk=item))
+                    resolved_relations[model_field.name] = resolved
+                    continue
+                resolved_relations[model_field.name] = model_field.related_model.objects.get(pk=v)
         return resolved_relations
 
     def _build_serializer_cls(self):
@@ -169,13 +222,19 @@ class ModelTypeSerializer(object):
                       [f.name for f in self.forward_rel_model_fields.values()]
         return allowed_names
 
+    @staticmethod
+    def _prefetch_is_many(model_field) -> bool:
+        if getattr(model_field, 'one_to_one', False):
+            return False
+        return bool(getattr(model_field, 'many_to_many', False) or getattr(model_field, 'one_to_many', False))
+
     def _build_prefetch_serializer(self, prefetch_field: str):
         # If the prefetch_field is not a model field, it must be a 'property field'.
         try:
             model_field = self.model_cls._meta.get_field(prefetch_field)
             serializer = ModelTypeSerializer(model_cls=model_field.related_model)
             serializer_cls = serializer.base_serializer_cls
-            return serializer_cls(many=False)
+            return serializer_cls(many=self._prefetch_is_many(model_field))
         except models.FieldDoesNotExist:
             return self._property_field_serializer()
 
@@ -193,11 +252,11 @@ class ModelTypeSerializer(object):
                     model_field = self.model_cls._meta.get_field(k)
                     serializer = ModelTypeSerializer(model_cls=model_field.related_model)
                     serializer_cls = serializer.build_prefetch_serializer_tree([v])
-                    prefetch_fields[model_field.name] = serializer_cls(many=False)
+                    prefetch_fields[model_field.name] = serializer_cls(many=self._prefetch_is_many(model_field))
 
         class Meta:
             model = self.model_cls
-            fields = self.field_names + list(prefetch_fields.keys())
+            fields = list(dict.fromkeys(list(self.field_names) + list(prefetch_fields.keys())))
 
         class_dict = {
             **{'Meta': Meta},

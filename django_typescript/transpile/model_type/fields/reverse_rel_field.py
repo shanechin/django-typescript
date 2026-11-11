@@ -21,6 +21,10 @@ class ReverseRelFieldTranspiler(object):
     def is_one_to_one(self):
         return isinstance(self.model_field, models.OneToOneRel)
 
+    @property
+    def is_many_to_many(self):
+        return isinstance(self.model_field, models.ManyToManyRel)
+
     def lookup_declarations(self):
         return [
             render_type_declaration(
@@ -33,10 +37,11 @@ class ReverseRelFieldTranspiler(object):
 
     @property
     def prefetch_type(self):
-        if self.is_one_to_one:
+        if self.is_one_to_one or self.is_many_to_many:
             base_key = self.model_field.name
             related_prefetch_type = model_prefetch_type_name(self.model_field.related_model)
             return f"'{base_key}' | {{{base_key}: {related_prefetch_type} | {related_prefetch_type}[]}}"
+        return None
 
     def getter_setter_type_declaration(self):
         if self.is_one_to_one:
@@ -46,6 +51,8 @@ class ReverseRelFieldTranspiler(object):
 
     @property
     def lookup_key(self):
+        if self.is_many_to_many:
+            return f" {self.model_field.field.name}: this.pk()"
         related_field = self.model_field.get_related_field()
         lookup_key = None
         for field in self.model_field.related_model._meta.get_fields():

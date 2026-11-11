@@ -58,7 +58,7 @@ FieldLookupInfo = typing.Tuple[str, typing.Union[ModelField, ModelClass], typing
 # ---------------------------------
 
 FORWARD_RELATION_FIELDS = (models.ForeignKey, models.OneToOneField)
-REVERSE_RELATION_FIELDS = (models.ManyToOneRel, )
+REVERSE_RELATION_FIELDS = (models.ManyToOneRel, models.ManyToManyRel)
 
 
 def field_is_reverse_relation(field: ModelField) -> bool:
@@ -70,7 +70,7 @@ def field_is_forward_relation(field: ModelField) -> bool:
 
 
 def field_is_relation(field: ModelField) -> bool:
-    return isinstance(field, REVERSE_RELATION_FIELDS + FORWARD_RELATION_FIELDS + (models.ManyToManyRel, ))
+    return isinstance(field, REVERSE_RELATION_FIELDS + FORWARD_RELATION_FIELDS + (models.ManyToManyField,))
 
 
 # =================================

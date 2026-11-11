@@ -127,7 +127,7 @@ export class __$queryset_name__{
 
     public async pageValues(pageNum: number = 1, pageSize: number = 25, ...fields: Array<keyof __$field_interface_name__>): Promise<ServerDataPayload<PaginatedData<QuerysetValuesList<__$field_interface_name__>>>>{
         this._valuesFields = fields;
-        return await this._retrieve();
+        return await this._retrieve(pageNum, pageSize);
     }
 
     public order_by(...fields: ModelFieldOrdering<__$field_interface_name__>[]): this{
@@ -180,15 +180,17 @@ export class __$queryset_name__{
     }
 
     private async _retrieve(pageNum?: number, pageSize?: number): Promise<ServerResponse>{
-        let urlQuery = "query=" + JSON.stringify(this.serializeQuery());
-        if (this._prefetch){urlQuery += "&prefetch=" + JSON.stringify(this._prefetch)}
-        if (this._orderBy){urlQuery += "&order_by=" + JSON.stringify(this._orderBy)}
-        if (this._distinct){urlQuery += "&distinct=" + JSON.stringify(this._distinct)}
-        if (this._exists){urlQuery += "&exists=" + JSON.stringify(true)}
-        if (this._count){urlQuery += "&count=" + JSON.stringify(true)}
-        if (this._valuesFields){urlQuery += "&values=" + JSON.stringify(this._valuesFields)}
-        if (pageNum){urlQuery += "&page=" + pageNum}
-        if (pageSize){urlQuery += "&pageSize=" + pageSize}
+        const urlQuery = buildUrlQuery({
+            query: JSON.stringify(this.serializeQuery()),
+            prefetch: this._prefetch ? JSON.stringify(this._prefetch) : undefined,
+            order_by: this._orderBy ? JSON.stringify(this._orderBy) : undefined,
+            distinct: this._distinct ? JSON.stringify(this._distinct) : undefined,
+            exists: this._exists ? JSON.stringify(true) : undefined,
+            count: this._count ? JSON.stringify(true) : undefined,
+            values: this._valuesFields ? JSON.stringify(this._valuesFields) : undefined,
+            page: pageNum,
+            pageSize: pageSize,
+        });
         let [responseData, statusCode, err] = await serverClient.get(`'{{ list_url}}'`, urlQuery);
         return [responseData, statusCode, err]
     }
@@ -282,7 +284,7 @@ export class __$model_name__ implements __$field_interface_name__{
 
      /*<{% for static_method in static_methods %}
       public static async {{ static_method.name }}({{ static_method.sig_interface }}){
-           return await serverClient.post(`{{ static_method.url}}`, data);
+           return await serverClient.post(`{{ static_method.url}}`, {{ 'data' if static_method.sig_interface else '{}' }});
       }
       {% endfor %}>*/
 

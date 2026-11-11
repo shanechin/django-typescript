@@ -128,6 +128,40 @@ class PrefetchTreeSelectRelated(object):
 # Model Type Queryset Builder
 # ---------------------------------
 
+def _coerce_int(value, default=None):
+    if value is None or value == '':
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def relation_lookup_is_to_many(model: types.ModelClass, lookup: str) -> bool:
+    """
+    True when a ``select_related``/``prefetch_related`` path crosses a to-many
+    relation. Those paths have to use ``prefetch_related``; ``select_related``
+    rejects many-to-many and reverse foreign keys.
+
+    """
+    current = model
+    to_many = False
+    for part in lookup.split('__'):
+        try:
+            field = current._meta.get_field(part)
+        except Exception:
+            break
+        if not getattr(field, 'one_to_one', False) and (
+            getattr(field, 'many_to_many', False) or getattr(field, 'one_to_many', False)
+        ):
+            to_many = True
+        related = getattr(field, 'related_model', None)
+        if related is None:
+            break
+        current = related
+    return to_many
+
+
 class ModelTypeQuerysetBuilder(object):
 
     """
@@ -153,8 +187,12 @@ class ModelTypeQuerysetBuilder(object):
         kwargs = {'model_cls': model_cls}
         if cls.QUERY_KEY in request.query_params:
             kwargs['query'] = ModelTypeQuery(**json.loads(request.query_params[cls.QUERY_KEY]))
-        if cls.ORDER_BY_KEY in request.query_params:
-            kwargs['order_by'] = json.loads(request.query_params[cls.ORDER_BY_KEY])
+        order_raw = request.query_params.get(cls.ORDER_BY_KEY)
+        if order_raw is None and 'order_on' in request.query_params:
+            # Older generated clients sent ``order_on``.
+            order_raw = request.query_params.get('order_on')
+        if order_raw is not None:
+            kwargs['order_by'] = json.loads(order_raw)
         if cls.PREFETCH_KEY in request.query_params:
             kwargs['prefetch_trees'] = json.loads(request.query_params[cls.PREFETCH_KEY])
         if cls.DISTINCT_KEY in request.query_params:
@@ -181,13 +219,22 @@ class ModelTypeQuerysetBuilder(object):
             queryset = queryset.distinct(*self.distinct)
         if self.prefetch_trees:
             select_related = []
+            prefetch_related = []
             for prefetch_tree in self.prefetch_trees:
                 tree_select_related = self._flatten_prefetch_tree(prefetch_tree=prefetch_tree)
-                if tree_select_related is not None:
-                    select_related += tree_select_related
-            queryset = queryset.select_related(
-                *[sr for sr in select_related if sr is not None]
-            )
+                if tree_select_related is None:
+                    continue
+                for key in tree_select_related:
+                    if key is None:
+                        continue
+                    if relation_lookup_is_to_many(self.model_cls, key):
+                        prefetch_related.append(key)
+                    else:
+                        select_related.append(key)
+            if select_related:
+                queryset = queryset.select_related(*select_related)
+            if prefetch_related:
+                queryset = queryset.prefetch_related(*prefetch_related)
         return queryset
 
 
@@ -220,9 +267,13 @@ class ModelTypeQuerysetPayloadBuilder(object):
 
     @classmethod
     def for_request(cls, request: Request, queryset: models.QuerySet, many=True) -> 'ModelTypeQuerysetPayloadBuilder':
+        page_size = request.query_params.get(cls.PAGE_SIZE_KEY)
+        if page_size is None:
+            # Older generated clients sent ``pagesize``.
+            page_size = request.query_params.get('pagesize', cls.DEFAULT_PAGE_SIZE)
         kwargs = {
-            'page_num': request.query_params.get(cls.PAGE_NUM_KEY),
-            'page_size': request.query_params.get(cls.PAGE_SIZE_KEY, cls.DEFAULT_PAGE_SIZE)
+            'page_num': _coerce_int(request.query_params.get(cls.PAGE_NUM_KEY)),
+            'page_size': _coerce_int(page_size, cls.DEFAULT_PAGE_SIZE),
         }
         if cls.VALUES_KEY in request.query_params:
             kwargs['values'] = json.loads(request.query_params[cls.VALUES_KEY])
@@ -235,6 +286,8 @@ class ModelTypeQuerysetPayloadBuilder(object):
     def paginated_payload(self, serializer_cls: types.ModelSerializerClass):
         assert self.is_paginated, 'Payload is not paginated.'
         queryset = self.queryset
+        if not queryset.ordered:
+            queryset = queryset.order_by('pk')
         if self.values:
             queryset = queryset.values(*self.values)
             serializer_cls = subset_serializer(serializer_cls=serializer_cls, select_fields=self.values)

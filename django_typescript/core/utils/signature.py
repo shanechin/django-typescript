@@ -1,4 +1,5 @@
 import inspect
+import typing
 from collections import OrderedDict
 from typing import Callable, Type, Dict
 
@@ -39,10 +40,15 @@ class Signature(object):
 
     def _make_parameters(self):
         signature = inspect.signature(self.callable)
+        try:
+            hints = typing.get_type_hints(self.callable)
+        except Exception:
+            hints = {}
         for param in signature.parameters.values():
             if param.name != 'self':
+                annotation = hints.get(param.name, param.annotation)
                 self.parameters[param.name] = Parameter(name=param.name,
-                                                        type_=signature.parameters[param.name].annotation,
+                                                        type_=annotation,
                                                         optional=param.default != inspect.Parameter.empty)
 
     def __getitem__(self, item) -> Parameter:

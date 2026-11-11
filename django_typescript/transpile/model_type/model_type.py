@@ -17,6 +17,7 @@ from django_typescript.transpile.model_type.common import (model_prefetch_type_n
 from django_typescript.transpile.model_type.fields import (ConcreteFieldTranspiler,
                                                            ForwardRelFieldTranspiler,
                                                            ReverseRelFieldTranspiler)
+from django_typescript.transpile.model_type.fields.many_to_many_field import ManyToManyFieldTranspiler
 
 
 # =================================
@@ -57,6 +58,7 @@ class ModelTypeTranspiler(object):
         self.pk_field_info: FieldInfo = None
         self.concrete_fields: List[ConcreteFieldTranspiler] = []
         self.forward_rel_fields: List[ForwardRelFieldTranspiler] = []
+        self.m2m_fields: List[ManyToManyFieldTranspiler] = []
         self.reverse_rel_fields: List[ReverseRelFieldTranspiler] = []
 
         self._resolve_pk_field_info()
@@ -88,6 +90,13 @@ class ModelTypeTranspiler(object):
         """
         for field_info in self.model_type.serializer.field_info:
             if isinstance(field_info.model_field, models.ManyToManyField):
+                self.m2m_fields.append(
+                    ManyToManyFieldTranspiler(
+                        model_field=field_info.model_field,
+                        serializer_field=field_info.serializer,
+                        serializer_field_name=field_info.serializer_field_name,
+                    )
+                )
                 continue
             # Fields that are not forward relations are 'concrete', and are
             # transpiled differently than forward relations.
@@ -109,9 +118,8 @@ class ModelTypeTranspiler(object):
                 )
 
         for model_field in self.model_type.model_inspector.reverse_relation_fields:
-            if not isinstance(model_field, models.ManyToManyRel):
-                if model_field.related_model in self.model_pool:
-                    self.reverse_rel_fields.append(ReverseRelFieldTranspiler(model_field=model_field))
+            if model_field.related_model in self.model_pool:
+                self.reverse_rel_fields.append(ReverseRelFieldTranspiler(model_field=model_field))
 
     def _property_field_interface_declarations(self):
         declarations = []
@@ -140,12 +148,16 @@ class ModelTypeTranspiler(object):
         for field in self.reverse_rel_fields:
             if field.model_field.related_model in self.model_pool:
                 type_declarations += field.lookup_declarations()
+        for field in self.m2m_fields:
+            type_declarations += field.lookup_declarations(
+                include_nested=field.model_field.related_model in self.model_pool
+            )
 
         return "\n".join(type_declarations)
 
     def model_interface_types(self):
         type_declarations = []
-        for field_transpiler in self.concrete_fields + self.forward_rel_fields:
+        for field_transpiler in self.concrete_fields + self.forward_rel_fields + self.m2m_fields:
             type_declarations.append(field_transpiler.serialized_type_declaration())
         type_declarations += self._property_field_interface_declarations()
         return "\n".join(type_declarations)
@@ -154,7 +166,7 @@ class ModelTypeTranspiler(object):
         type_declarations = []
         # For concrete fields, the 'class type declaration' is the same is the
         # interface/serializer field type declaration.
-        for field_transpiler in self.concrete_fields:
+        for field_transpiler in self.concrete_fields + self.m2m_fields:
             type_declarations.append(field_transpiler.serialized_type_declaration())
         # For forward relation fields, the 'class type declaration' is the same is the
         # interface/serializer field type declaration, but with the addition of a
@@ -177,8 +189,11 @@ class ModelTypeTranspiler(object):
         for field_transpiler in self.forward_rel_fields:
             if field_transpiler.model_field.related_model in self.model_pool:
                 prefetch_parts.append(field_transpiler.prefetch_type)
+        for field_transpiler in self.m2m_fields:
+            if field_transpiler.model_field.related_model in self.model_pool:
+                prefetch_parts.append(field_transpiler.prefetch_type)
         for field_transpiler in self.reverse_rel_fields:
-            if field_transpiler.is_one_to_one:
+            if field_transpiler.prefetch_type and field_transpiler.model_field.related_model in self.model_pool:
                 prefetch_parts.append(field_transpiler.prefetch_type)
         if self.model_type.property_fields is not None:
             prefetch_parts += [f"'{f}'" for f in self.model_type.property_fields]
@@ -241,6 +256,10 @@ class ModelTypeTranspiler(object):
                 field_schemas.append(
                     field_transpiler.serializer_field_name + ": " + field_transpiler.schema()
                 )
+        for field_transpiler in self.m2m_fields:
+            field_schemas.append(
+                field_transpiler.serializer_field_name + ": " + field_transpiler.schema()
+            )
         return ", \n".join(field_schemas)
 
     def transpile(self):

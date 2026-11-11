@@ -8,4 +8,5 @@ from django.apps import AppConfig
 class DjangoTypeScriptConfig(AppConfig):
 
     name = 'django_typescript'
+    default_auto_field = 'django.db.models.BigAutoField'
 

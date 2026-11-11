@@ -1,5 +1,4 @@
 import {ModelClass} from "./types";
-import preventExtensions = Reflect.preventExtensions;
 import {ServerClient} from './serverClient'
 
 

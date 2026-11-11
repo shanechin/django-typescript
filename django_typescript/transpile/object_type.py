@@ -59,7 +59,7 @@ class ObjectTypeTranspiler(object):
                 ObjectMethod(
                     name=method_view.name,
                     url=self._url_prefix + method_view.endpoint.url(),
-                    sig_interface=method_sig_interface(method_view.arg_serializer_cls),
+                    sig_interface=method_sig_interface(method_view.arg_serializer_cls, method_view.func_sig),
                 )
             )
         return methods
@@ -71,7 +71,7 @@ class ObjectTypeTranspiler(object):
                 ObjectMethod(
                     name=static_method_view.name,
                     url=self._url_prefix + static_method_view.endpoint.url(),
-                    sig_interface=method_sig_interface(static_method_view.arg_serializer_cls),
+                    sig_interface=method_sig_interface(static_method_view.arg_serializer_cls, static_method_view.func_sig),
                 )
             )
         return static_methods

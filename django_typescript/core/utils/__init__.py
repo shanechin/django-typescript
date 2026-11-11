@@ -13,3 +13,10 @@ def camel_case_to_underscore(name):
 
 def underscore_to_dash(name: str):
     return name.replace('_', '-')
+
+
+def unwrap_method(value):
+    """Return the function wrapped by classmethod/staticmethod, if any."""
+    while isinstance(value, (classmethod, staticmethod)):
+        value = value.__func__
+    return value

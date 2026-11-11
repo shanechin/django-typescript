@@ -1,8 +1,7 @@
 import os
+import shutil
 import subprocess
 from typing import Type
-from distutils.dir_util import copy_tree
-from distutils.file_util import copy_file
 
 from django_typescript.core.utils.typescript_template import TypeScriptTemplate
 from django_typescript.transpile import templates
@@ -17,6 +16,18 @@ from django_typescript.transpile.model_type.common import (model_prefetch_type_n
 # =================================
 # Transpiler
 # ---------------------------------
+
+def _copy_tree(src: str, dst: str):
+    """Copy the contents of ``src`` into ``dst``, replacing existing files."""
+    os.makedirs(dst, exist_ok=True)
+    for entry in os.listdir(src):
+        source = os.path.join(src, entry)
+        target = os.path.join(dst, entry)
+        if os.path.isdir(source):
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, target)
+
 
 class Transpiler(object):
 
@@ -44,9 +55,9 @@ class Transpiler(object):
         dest_core_dir = os.path.join(self.destination_dir, 'core')
         if not os.path.exists(dest_core_dir):
             os.mkdir(dest_core_dir)
-        copy_tree(str(templates.SOURCE_CORE_DIR), dest_core_dir)
-        copy_file(str(templates.CLIENT_TEMPLATE_FILE),
-                  os.path.join(self.destination_dir, templates.CLIENT_TEMPLATE_FILENAME))
+        _copy_tree(str(templates.SOURCE_CORE_DIR), dest_core_dir)
+        shutil.copy2(str(templates.CLIENT_TEMPLATE_FILE),
+                     os.path.join(self.destination_dir, templates.CLIENT_TEMPLATE_FILENAME))
         index_ts = open(os.path.join(self.destination_dir, 'index.ts'), "w+")
         index_ts.write("""export * from './models'\nexport * from './client'
         """)

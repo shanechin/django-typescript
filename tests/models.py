@@ -55,3 +55,18 @@ class GenericModel(TestModel):
 class TimestampedModel(TestModel):
     name = models.CharField(null=True, max_length=200)
     timestamp = models.DateTimeField(null=True)
+
+
+class Tag(TestModel):
+    name = models.CharField(max_length=50)
+
+
+class Article(TestModel):
+    title = models.CharField(max_length=100)
+    tags = models.ManyToManyField(Tag, related_name='articles', blank=True)
+    small_number = models.SmallIntegerField(null=True)
+    positive_small = models.PositiveSmallIntegerField(null=True)
+    big_number = models.BigIntegerField(null=True)
+    positive_big = models.PositiveBigIntegerField(null=True)
+    positive_number = models.PositiveIntegerField(null=True)
+    active = models.BooleanField(default=False)

@@ -4,6 +4,7 @@ import re
 from rest_framework import serializers
 from django.urls import path
 
+from django_typescript.core.utils import unwrap_method
 from django_typescript.core.utils.signature import Signature
 from django_typescript.object_types.views import ObjectMethodView, ObjectStaticMethodView
 
@@ -34,6 +35,7 @@ class ObjectType(object):
     def method_views(cls) -> typing.List[ObjectMethodView]:
         method_views = []
         for k, v in cls.__dict__.items():
+            v = unwrap_method(v)
             if isinstance(v, ObjectMethodView):
                 method_views.append(v)
         return method_views
@@ -42,6 +44,7 @@ class ObjectType(object):
     def static_method_views(cls) -> typing.List[ObjectStaticMethodView]:
         static_method_views = []
         for k, v in cls.__dict__.items():
+            v = unwrap_method(v)
             if isinstance(v, ObjectStaticMethodView):
                 static_method_views.append(v)
         return static_method_views

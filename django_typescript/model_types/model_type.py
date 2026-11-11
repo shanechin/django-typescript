@@ -9,6 +9,7 @@ from rest_framework.generics import CreateAPIView
 from django_typescript.model_types.serializer import ModelTypeSerializer
 from django_typescript.core.model_inspector import ModelInspector
 from django_typescript.core import types
+from django_typescript.core.utils import unwrap_method
 from django_typescript.model_types.views import (CreateView,
                                                  DeleteView,
                                                  GetView,
@@ -128,6 +129,7 @@ class ModelType(object):
     def method_views(self):
         method_views = []
         for k, v in self.__class__.__dict__.items():
+            v = unwrap_method(v)
             if isinstance(v, ModelMethodView):
                 method_views.append(v)
         return method_views
@@ -136,6 +138,7 @@ class ModelType(object):
     def static_method_views(self):
         static_method_views = []
         for k, v in self.__class__.__dict__.items():
+            v = unwrap_method(v)
             if isinstance(v, ModelStaticMethodView):
                 static_method_views.append(v)
         return static_method_views
